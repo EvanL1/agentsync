@@ -79,12 +79,16 @@ fn sync_platform(project_dir: &Path, source: &Path, platform: &Platform, dry_run
         }
     }
 
-    // 3. Skills/Commands
+    // 3. Skills
     if let Some(skills_subdir) = platform.skills_dir {
         let skills_src = source.join("skills");
         if skills_src.is_dir() {
             let skills_dest = target_base.join(skills_subdir);
-            result.files_synced += copy_md_dir(&skills_src, &skills_dest, &mut result.errors, dry_run, &mut result.warnings);
+            if platform.skills_as_dir {
+                result.files_synced += sync_skills_dir(&skills_src, &skills_dest, &mut result.errors, dry_run, &mut result.warnings);
+            } else {
+                result.files_synced += copy_md_dir(&skills_src, &skills_dest, &mut result.errors, dry_run, &mut result.warnings);
+            }
         }
     }
 
@@ -166,6 +170,35 @@ fn copy_md_dir(src: &Path, dest: &Path, errors: &mut Vec<String>, dry_run: bool,
     count
 }
 
+/// Sync skills as directories: foo.md → foo/SKILL.md
+fn sync_skills_dir(src: &Path, dest: &Path, errors: &mut Vec<String>, dry_run: bool, warnings: &mut Vec<String>) -> usize {
+    let mut count = 0;
+    let entries = match fs::read_dir(src) {
+        Ok(e) => e,
+        Err(e) => { errors.push(format!("read {}: {e}", src.display())); return 0; }
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("md") { continue; }
+
+        if let Some(w) = check_frontmatter(&path) {
+            warnings.push(w);
+        }
+        let stem = path.file_stem().unwrap().to_string_lossy();
+        let dest_file = dest.join(stem.as_ref()).join("SKILL.md");
+        if dry_run {
+            count += 1;
+        } else {
+            match ensure_copy(&path, &dest_file) {
+                Ok(_) => count += 1,
+                Err(e) => errors.push(format!("{}/SKILL.md: {e}", stem)),
+            }
+        }
+    }
+    count
+}
+
 /// Check if a markdown file has valid YAML frontmatter
 fn check_frontmatter(path: &Path) -> Option<String> {
     let content = fs::read_to_string(path).ok()?;
@@ -233,7 +266,11 @@ pub fn sync_user(home: &Path, source: &Path) -> Vec<SyncResult> {
             let skills_src = source.join("skills");
             if skills_src.is_dir() {
                 let skills_dest = user_dir.join(skills_subdir);
-                result.files_synced += copy_md_dir(&skills_src, &skills_dest, &mut result.errors, false, &mut result.warnings);
+                if platform.skills_as_dir {
+                    result.files_synced += sync_skills_dir(&skills_src, &skills_dest, &mut result.errors, false, &mut result.warnings);
+                } else {
+                    result.files_synced += copy_md_dir(&skills_src, &skills_dest, &mut result.errors, false, &mut result.warnings);
+                }
             }
         }
 
@@ -284,8 +321,13 @@ pub fn import_from(project_dir: &Path, platform_name: &str) -> Result<usize, Str
     if let Some(skills_subdir) = platform.skills_dir {
         let skills_dir = platform_dir.join(skills_subdir);
         if skills_dir.is_dir() {
-            count += import_md_files(&skills_dir, &source.join("skills"))
-                .map_err(|e| e.to_string())?;
+            if platform.skills_as_dir {
+                count += import_skills_dir(&skills_dir, &source.join("skills"))
+                    .map_err(|e| e.to_string())?;
+            } else {
+                count += import_md_files(&skills_dir, &source.join("skills"))
+                    .map_err(|e| e.to_string())?;
+            }
         }
     }
 
@@ -328,6 +370,27 @@ fn import_rules(src: &Path, dest: &Path, src_ext: &str) -> std::io::Result<usize
         if !dest_file.exists() {
             fs::copy(&path, &dest_file)?;
             count += 1;
+        }
+    }
+    Ok(count)
+}
+
+/// Import directory-based skills: <name>/SKILL.md → <name>.md
+fn import_skills_dir(src: &Path, dest: &Path) -> std::io::Result<usize> {
+    fs::create_dir_all(dest)?;
+    let mut count = 0;
+    for entry in fs::read_dir(src)?.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            let skill_md = path.join("SKILL.md");
+            if skill_md.exists() {
+                let name = path.file_name().unwrap().to_string_lossy();
+                let dest_file = dest.join(format!("{name}.md"));
+                if !dest_file.exists() {
+                    fs::copy(&skill_md, &dest_file)?;
+                    count += 1;
+                }
+            }
         }
     }
     Ok(count)

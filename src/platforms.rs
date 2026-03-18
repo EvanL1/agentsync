@@ -1,13 +1,13 @@
 // Platform definitions — verified config paths for each AI coding tool
 //
-// Sources:
+// Sources (verified 2026-03):
 //   Claude Code: https://code.claude.com/docs/en/skills
-//   Codex CLI:   https://developers.openai.com/codex/guides/agents-md/
-//   Gemini CLI:  https://google-gemini.github.io/gemini-cli/docs/get-started/configuration.html
-//   Cursor:      https://docs.cursor.com/context/rules
+//   Codex CLI:   https://github.com/openai/codex (source inspection)
+//   Gemini CLI:  https://github.com/google-gemini/gemini-cli (docs/)
+//   Cursor:      https://cursor.com/docs/context/rules
 //   Copilot:     https://docs.github.com/copilot/customizing-copilot/adding-custom-instructions-for-github-copilot
-//   Windsurf:    https://windsurf.com/editor/directory
-//   Cline:       https://docs.cline.bot/cline-cli/configuration
+//   Windsurf:    https://docs.windsurf.com/windsurf/cascade/memories.md
+//   Cline:       https://docs.cline.bot/customization/overview
 
 pub struct Platform {
     pub name: &'static str,
@@ -21,6 +21,7 @@ pub struct Platform {
     pub rules_dir: Option<&'static str>,  // subdirectory for rules (None = not supported)
     pub rules_ext: &'static str,          // file extension for rules: "md", "mdc", "instructions.md"
     pub skills_dir: Option<&'static str>, // subdirectory for skills/commands
+    pub skills_as_dir: bool,              // true = <name>/SKILL.md directory format
     pub agents_dir: Option<&'static str>, // subdirectory for agents
 
     // User-level (global) directory
@@ -30,8 +31,9 @@ pub struct Platform {
 
 pub const PLATFORMS: &[Platform] = &[
     // ── Claude Code ──
-    // CLAUDE.md at project root, .claude/{rules,commands,agents}/*.md
-    // User: ~/.claude/CLAUDE.md, ~/.claude/{rules,commands}/*.md
+    // CLAUDE.md at project root, .claude/{rules,skills,agents}/*.md
+    // Skills: .claude/skills/<name>/SKILL.md (directory per skill, replaces legacy commands/)
+    // User: ~/.claude/CLAUDE.md, ~/.claude/{rules,skills,agents}/
     Platform {
         name: "claude",
         root_md: "CLAUDE.md",
@@ -40,7 +42,8 @@ pub const PLATFORMS: &[Platform] = &[
         project_dir: ".claude",
         rules_dir: Some("rules"),
         rules_ext: "md",
-        skills_dir: Some("commands"),     // Claude calls them "commands" (slash commands)
+        skills_dir: Some("skills"),       // was "commands" (legacy), now "skills"
+        skills_as_dir: true,              // skills/<name>/SKILL.md
         agents_dir: Some("agents"),
         user_dir: Some("~/.claude"),
         user_root_md: Some("CLAUDE.md"),
@@ -48,34 +51,37 @@ pub const PLATFORMS: &[Platform] = &[
 
     // ── Codex CLI (OpenAI) ──
     // AGENTS.md at project root (walks up to git root)
-    // User: ~/.codex/AGENTS.md or AGENTS.override.md
-    // No subdirectory convention for rules/skills
+    // Skills: .codex/skills/<name>/SKILL.md (directory per skill)
+    // User: ~/.codex/ (config.toml + AGENTS.md via hierarchical scan)
     Platform {
         name: "codex",
         root_md: "AGENTS.md",
-        root_md_in_subdir: false,         // AGENTS.md at project root
+        root_md_in_subdir: false,
 
         project_dir: ".codex",
-        rules_dir: None,                  // Codex has no rules subdirectory
+        rules_dir: None,
         rules_ext: "md",
-        skills_dir: None,                 // Codex has no skills subdirectory
+        skills_dir: Some("skills"),
+        skills_as_dir: true,              // skills/<name>/SKILL.md
         agents_dir: None,
         user_dir: Some("~/.codex"),
-        user_root_md: Some("AGENTS.md"),  // or AGENTS.override.md
+        user_root_md: Some("AGENTS.md"),
     },
 
     // ── Gemini CLI (Google) ──
-    // GEMINI.md at project root, .gemini/commands/*.toml for slash commands
-    // User: ~/.gemini/GEMINI.md, ~/.gemini/commands/*.toml
+    // GEMINI.md at project root
+    // Skills: .gemini/skills/<name>/SKILL.md (directory per skill)
+    // User: ~/.gemini/GEMINI.md, ~/.gemini/skills/
     Platform {
         name: "gemini",
         root_md: "GEMINI.md",
-        root_md_in_subdir: false,         // GEMINI.md at project root
+        root_md_in_subdir: false,
 
         project_dir: ".gemini",
-        rules_dir: None,                  // Gemini has no rules dir, uses GEMINI.md
+        rules_dir: None,
         rules_ext: "md",
-        skills_dir: None,                 // commands are .toml, not .md — skip for now
+        skills_dir: Some("skills"),
+        skills_as_dir: true,              // skills/<name>/SKILL.md
         agents_dir: None,
         user_dir: Some("~/.gemini"),
         user_root_md: Some("GEMINI.md"),
@@ -83,6 +89,7 @@ pub const PLATFORMS: &[Platform] = &[
 
     // ── Cursor ──
     // .cursorrules at project root (legacy), .cursor/rules/*.mdc (current)
+    // Also supports AGENTS.md and .md rules files
     // User: ~/.cursor/rules/*.mdc
     Platform {
         name: "cursor",
@@ -91,32 +98,36 @@ pub const PLATFORMS: &[Platform] = &[
 
         project_dir: ".cursor",
         rules_dir: Some("rules"),
-        rules_ext: "mdc",                // Cursor uses .mdc format, not .md
+        rules_ext: "mdc",
         skills_dir: None,
+        skills_as_dir: false,
         agents_dir: None,
         user_dir: Some("~/.cursor"),
-        user_root_md: None,              // Cursor uses .cursor/rules/ not a root md
+        user_root_md: None,
     },
 
     // ── GitHub Copilot ──
     // .github/copilot-instructions.md, .github/instructions/*.instructions.md
-    // No user-level config directory
+    // Prompts: .github/prompts/*.prompt.md (not synced — different format)
     Platform {
         name: "copilot",
         root_md: "copilot-instructions.md",
-        root_md_in_subdir: true,          // .github/copilot-instructions.md
+        root_md_in_subdir: true,
 
         project_dir: ".github",
         rules_dir: Some("instructions"),
-        rules_ext: "instructions.md",     // Copilot uses .instructions.md suffix
+        rules_ext: "instructions.md",
         skills_dir: None,
+        skills_as_dir: false,
         agents_dir: None,
-        user_dir: None,                   // No user-level directory
+        user_dir: None,
         user_root_md: None,
     },
 
     // ── Windsurf ──
-    // .windsurfrules at project root, .windsurf/rules/*.md
+    // .windsurfrules at project root (also supports AGENTS.md)
+    // .windsurf/rules/*.md
+    // User: ~/.codeium/windsurf/memories/global_rules.md
     Platform {
         name: "windsurf",
         root_md: ".windsurfrules",
@@ -126,22 +137,25 @@ pub const PLATFORMS: &[Platform] = &[
         rules_dir: Some("rules"),
         rules_ext: "md",
         skills_dir: None,
+        skills_as_dir: false,
         agents_dir: None,
-        user_dir: None,
+        user_dir: Some("~/.codeium/windsurf"),
         user_root_md: None,
     },
 
     // ── Cline ──
-    // .clinerules at project root (single file) OR .clinerules/ directory with multiple files
-    // User: ~/.cline/
+    // .clinerules/ directory for rules
+    // Skills: .cline/skills/ (separate base dir — not yet synced)
+    // User: ~/Documents/Cline/Rules/ (rules), ~/.cline/skills/ (skills)
     Platform {
         name: "cline",
         root_md: ".clinerules",
         root_md_in_subdir: false,
-        project_dir: ".clinerules",       // .clinerules/ doubles as the rules dir
-        rules_dir: None,                  // rules go directly in .clinerules/
+        project_dir: ".clinerules",
+        rules_dir: None,
         rules_ext: "md",
-        skills_dir: None,
+        skills_dir: None,                // TODO: .cline/skills/ (different base dir)
+        skills_as_dir: false,
         agents_dir: None,
         user_dir: Some("~/.cline"),
         user_root_md: None,
