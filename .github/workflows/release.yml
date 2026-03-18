@@ -14,19 +14,19 @@ jobs:
         include:
           - target: x86_64-apple-darwin
             os: macos-latest
-            name: agentsync-darwin-x86_64
+            name: aisync-darwin-x86_64
           - target: aarch64-apple-darwin
             os: macos-latest
-            name: agentsync-darwin-aarch64
+            name: aisync-darwin-aarch64
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
-            name: agentsync-linux-x86_64
+            name: aisync-linux-x86_64
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-latest
-            name: agentsync-linux-aarch64
+            name: aisync-linux-aarch64
           - target: x86_64-pc-windows-msvc
             os: windows-latest
-            name: agentsync-windows-x86_64
+            name: aisync-windows-x86_64
 
     runs-on: ${{ matrix.os }}
     steps:
@@ -49,14 +49,14 @@ jobs:
         if: runner.os != 'Windows'
         run: |
           cd target/${{ matrix.target }}/release
-          tar czf ../../../${{ matrix.name }}.tar.gz agentsync
+          tar czf ../../../${{ matrix.name }}.tar.gz aisync
           cd ../../..
 
       - name: Package (Windows)
         if: runner.os == 'Windows'
         run: |
           cd target/${{ matrix.target }}/release
-          7z a ../../../${{ matrix.name }}.zip agentsync.exe
+          7z a ../../../${{ matrix.name }}.zip aisync.exe
           cd ../../..
 
       - uses: actions/upload-artifact@v4
@@ -77,8 +77,30 @@ jobs:
         with:
           generate_release_notes: true
           files: |
-            agentsync-darwin-x86_64.tar.gz
-            agentsync-darwin-aarch64.tar.gz
-            agentsync-linux-x86_64.tar.gz
-            agentsync-linux-aarch64.tar.gz
-            agentsync-windows-x86_64.zip
+            aisync-darwin-x86_64.tar.gz
+            aisync-darwin-aarch64.tar.gz
+            aisync-linux-x86_64.tar.gz
+            aisync-linux-aarch64.tar.gz
+            aisync-windows-x86_64.zip
+
+  npm-publish:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+
+      - name: Sync version from tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          cd npm
+          npm version "$VERSION" --no-git-tag-version --allow-same-version
+
+      - name: Publish to npm
+        run: npm publish ./npm --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

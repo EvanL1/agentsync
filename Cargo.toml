@@ -1,12 +1,10 @@
 [package]
-name = "agentsync"
-version = "0.1.0"
+name = "aisync"
+version = "0.2.0"
 edition = "2021"
 description = "Sync AI agent configs across Claude Code, Codex, Gemini CLI, Cursor, Copilot — one source, all platforms"
-repository = "https://github.com/EvanL1/agentsync"
+repository = "https://github.com/EvanL1/aisync"
 keywords = ["ai", "agent", "sync", "claude", "codex"]
 categories = ["command-line-utilities", "development-tools"]
 
 [dependencies]
-serde = { version = "1", features = ["derive"] }
-toml = "0.8"

@@ -13,15 +13,15 @@ pub struct SyncResult {
 pub fn detect_platforms(project_dir: &Path) -> Vec<&'static Platform> {
     PLATFORMS
         .iter()
-        .filter(|p| project_dir.join(p.project_dir).exists() || project_dir.join(SOURCE_DIR).exists())
+        .filter(|p| project_dir.join(p.project_dir).exists())
         .collect()
 }
 
 /// Sync from .agents/ source to all (or specified) platforms
-pub fn sync_project(project_dir: &Path, targets: &[&str]) -> Vec<SyncResult> {
+pub fn sync_project(project_dir: &Path, targets: &[&str], dry_run: bool) -> Vec<SyncResult> {
     let source = project_dir.join(SOURCE_DIR);
     if !source.exists() {
-        eprintln!("No {} directory found. Run `agentsync init` first.", SOURCE_DIR);
+        eprintln!("No {} directory found. Run `aisync init` first.", SOURCE_DIR);
         return vec![];
     }
 
@@ -33,14 +33,14 @@ pub fn sync_project(project_dir: &Path, targets: &[&str]) -> Vec<SyncResult> {
 
     // Sync AGENTS.md to project root (universal)
     let root_md_src = source.join("AGENTS.md");
-    if root_md_src.exists() {
+    if root_md_src.exists() && !dry_run {
         let _ = fs::copy(&root_md_src, project_dir.join(UNIVERSAL_ROOT_MD));
     }
 
-    platforms.iter().map(|p| sync_platform(project_dir, &source, p)).collect()
+    platforms.iter().map(|p| sync_platform(project_dir, &source, p, dry_run)).collect()
 }
 
-fn sync_platform(project_dir: &Path, source: &Path, platform: &Platform) -> SyncResult {
+fn sync_platform(project_dir: &Path, source: &Path, platform: &Platform, dry_run: bool) -> SyncResult {
     let mut result = SyncResult {
         platform: platform.name.to_string(),
         files_synced: 0,
@@ -58,9 +58,13 @@ fn sync_platform(project_dir: &Path, source: &Path, platform: &Platform) -> Sync
             project_dir.join(platform.root_md)
         };
 
-        match ensure_copy(&root_md_src, &dest) {
-            Ok(_) => result.files_synced += 1,
-            Err(e) => result.errors.push(format!("{}: {e}", platform.root_md)),
+        if dry_run {
+            result.files_synced += 1;
+        } else {
+            match ensure_copy(&root_md_src, &dest) {
+                Ok(_) => result.files_synced += 1,
+                Err(e) => result.errors.push(format!("{}: {e}", platform.root_md)),
+            }
         }
     }
 
@@ -69,7 +73,7 @@ fn sync_platform(project_dir: &Path, source: &Path, platform: &Platform) -> Sync
         let rules_src = source.join("rules");
         if rules_src.is_dir() {
             let rules_dest = target_base.join(rules_subdir);
-            result.files_synced += sync_rules(&rules_src, &rules_dest, platform.rules_ext, &mut result.errors);
+            result.files_synced += sync_rules(&rules_src, &rules_dest, platform.rules_ext, &mut result.errors, dry_run);
         }
     }
 
@@ -78,7 +82,7 @@ fn sync_platform(project_dir: &Path, source: &Path, platform: &Platform) -> Sync
         let skills_src = source.join("skills");
         if skills_src.is_dir() {
             let skills_dest = target_base.join(skills_subdir);
-            result.files_synced += copy_md_dir(&skills_src, &skills_dest, &mut result.errors);
+            result.files_synced += copy_md_dir(&skills_src, &skills_dest, &mut result.errors, dry_run);
         }
     }
 
@@ -87,7 +91,7 @@ fn sync_platform(project_dir: &Path, source: &Path, platform: &Platform) -> Sync
         let agents_src = source.join("agents");
         if agents_src.is_dir() {
             let agents_dest = target_base.join(agents_subdir);
-            result.files_synced += copy_md_dir(&agents_src, &agents_dest, &mut result.errors);
+            result.files_synced += copy_md_dir(&agents_src, &agents_dest, &mut result.errors, dry_run);
         }
     }
 
@@ -97,7 +101,7 @@ fn sync_platform(project_dir: &Path, source: &Path, platform: &Platform) -> Sync
 /// Sync rules with extension conversion:
 ///   .md source → .mdc for Cursor
 ///   .md source → .instructions.md for Copilot
-fn sync_rules(src: &Path, dest: &Path, target_ext: &str, errors: &mut Vec<String>) -> usize {
+fn sync_rules(src: &Path, dest: &Path, target_ext: &str, errors: &mut Vec<String>, dry_run: bool) -> usize {
     let mut count = 0;
     let entries = match fs::read_dir(src) {
         Ok(e) => e,
@@ -120,16 +124,20 @@ fn sync_rules(src: &Path, dest: &Path, target_ext: &str, errors: &mut Vec<String
         };
 
         let dest_file = dest.join(&dest_name);
-        match ensure_copy(&path, &dest_file) {
-            Ok(_) => count += 1,
-            Err(e) => errors.push(format!("{dest_name}: {e}")),
+        if dry_run {
+            count += 1;
+        } else {
+            match ensure_copy(&path, &dest_file) {
+                Ok(_) => count += 1,
+                Err(e) => errors.push(format!("{dest_name}: {e}")),
+            }
         }
     }
     count
 }
 
 /// Copy all .md files as-is
-fn copy_md_dir(src: &Path, dest: &Path, errors: &mut Vec<String>) -> usize {
+fn copy_md_dir(src: &Path, dest: &Path, errors: &mut Vec<String>, dry_run: bool) -> usize {
     let mut count = 0;
     let entries = match fs::read_dir(src) {
         Ok(e) => e,
@@ -140,9 +148,13 @@ fn copy_md_dir(src: &Path, dest: &Path, errors: &mut Vec<String>) -> usize {
         let path = entry.path();
         if path.extension().and_then(|e| e.to_str()) == Some("md") {
             let dest_file = dest.join(path.file_name().unwrap());
-            match ensure_copy(&path, &dest_file) {
-                Ok(_) => count += 1,
-                Err(e) => errors.push(format!("{}: {e}", path.file_name().unwrap().to_string_lossy())),
+            if dry_run {
+                count += 1;
+            } else {
+                match ensure_copy(&path, &dest_file) {
+                    Ok(_) => count += 1,
+                    Err(e) => errors.push(format!("{}: {e}", path.file_name().unwrap().to_string_lossy())),
+                }
             }
         }
     }
@@ -184,7 +196,7 @@ pub fn sync_user(home: &Path, source: &Path) -> Vec<SyncResult> {
             let rules_src = source.join("rules");
             if rules_src.is_dir() {
                 let rules_dest = user_dir.join(rules_subdir);
-                result.files_synced += sync_rules(&rules_src, &rules_dest, platform.rules_ext, &mut result.errors);
+                result.files_synced += sync_rules(&rules_src, &rules_dest, platform.rules_ext, &mut result.errors, false);
             }
         }
 
@@ -193,7 +205,7 @@ pub fn sync_user(home: &Path, source: &Path) -> Vec<SyncResult> {
             let skills_src = source.join("skills");
             if skills_src.is_dir() {
                 let skills_dest = user_dir.join(skills_subdir);
-                result.files_synced += copy_md_dir(&skills_src, &skills_dest, &mut result.errors);
+                result.files_synced += copy_md_dir(&skills_src, &skills_dest, &mut result.errors, false);
             }
         }
 

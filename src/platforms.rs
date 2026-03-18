@@ -1,13 +1,13 @@
-/// Platform definitions — verified config paths for each AI coding tool
-///
-/// Sources:
-///   Claude Code: https://code.claude.com/docs/en/skills
-///   Codex CLI:   https://developers.openai.com/codex/guides/agents-md/
-///   Gemini CLI:  https://google-gemini.github.io/gemini-cli/docs/get-started/configuration.html
-///   Cursor:      https://docs.cursor.com/context/rules
-///   Copilot:     https://docs.github.com/copilot/customizing-copilot/adding-custom-instructions-for-github-copilot
-///   Windsurf:    https://windsurf.com/editor/directory
-///   Cline:       https://docs.cline.bot/cline-cli/configuration
+// Platform definitions — verified config paths for each AI coding tool
+//
+// Sources:
+//   Claude Code: https://code.claude.com/docs/en/skills
+//   Codex CLI:   https://developers.openai.com/codex/guides/agents-md/
+//   Gemini CLI:  https://google-gemini.github.io/gemini-cli/docs/get-started/configuration.html
+//   Cursor:      https://docs.cursor.com/context/rules
+//   Copilot:     https://docs.github.com/copilot/customizing-copilot/adding-custom-instructions-for-github-copilot
+//   Windsurf:    https://windsurf.com/editor/directory
+//   Cline:       https://docs.cline.bot/cline-cli/configuration
 
 pub struct Platform {
     pub name: &'static str,
@@ -15,7 +15,6 @@ pub struct Platform {
     // Root instruction file
     pub root_md: &'static str,            // filename: CLAUDE.md, AGENTS.md, GEMINI.md, etc.
     pub root_md_in_subdir: bool,          // true = inside project_dir, false = project root
-    pub root_md_is_dir: bool,             // true = .clinerules/ is a directory, not a file
 
     // Project-level directories
     pub project_dir: &'static str,        // .claude, .cursor, .github, etc.
@@ -37,7 +36,7 @@ pub const PLATFORMS: &[Platform] = &[
         name: "claude",
         root_md: "CLAUDE.md",
         root_md_in_subdir: false,
-        root_md_is_dir: false,
+
         project_dir: ".claude",
         rules_dir: Some("rules"),
         rules_ext: "md",
@@ -55,7 +54,7 @@ pub const PLATFORMS: &[Platform] = &[
         name: "codex",
         root_md: "AGENTS.md",
         root_md_in_subdir: false,         // AGENTS.md at project root
-        root_md_is_dir: false,
+
         project_dir: ".codex",
         rules_dir: None,                  // Codex has no rules subdirectory
         rules_ext: "md",
@@ -72,7 +71,7 @@ pub const PLATFORMS: &[Platform] = &[
         name: "gemini",
         root_md: "GEMINI.md",
         root_md_in_subdir: false,         // GEMINI.md at project root
-        root_md_is_dir: false,
+
         project_dir: ".gemini",
         rules_dir: None,                  // Gemini has no rules dir, uses GEMINI.md
         rules_ext: "md",
@@ -89,7 +88,7 @@ pub const PLATFORMS: &[Platform] = &[
         name: "cursor",
         root_md: ".cursorrules",
         root_md_in_subdir: false,
-        root_md_is_dir: false,
+
         project_dir: ".cursor",
         rules_dir: Some("rules"),
         rules_ext: "mdc",                // Cursor uses .mdc format, not .md
@@ -106,7 +105,7 @@ pub const PLATFORMS: &[Platform] = &[
         name: "copilot",
         root_md: "copilot-instructions.md",
         root_md_in_subdir: true,          // .github/copilot-instructions.md
-        root_md_is_dir: false,
+
         project_dir: ".github",
         rules_dir: Some("instructions"),
         rules_ext: "instructions.md",     // Copilot uses .instructions.md suffix
@@ -122,7 +121,7 @@ pub const PLATFORMS: &[Platform] = &[
         name: "windsurf",
         root_md: ".windsurfrules",
         root_md_in_subdir: false,
-        root_md_is_dir: false,
+
         project_dir: ".windsurf",
         rules_dir: Some("rules"),
         rules_ext: "md",
@@ -139,7 +138,6 @@ pub const PLATFORMS: &[Platform] = &[
         name: "cline",
         root_md: ".clinerules",
         root_md_in_subdir: false,
-        root_md_is_dir: false,            // can be file or directory
         project_dir: ".clinerules",       // .clinerules/ doubles as the rules dir
         rules_dir: None,                  // rules go directly in .clinerules/
         rules_ext: "md",

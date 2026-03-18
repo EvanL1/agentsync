@@ -1,9 +1,14 @@
-# agentsync
+# aisync
+
+[![CI](https://github.com/EvanL1/aisync/actions/workflows/ci.yml/badge.svg)](https://github.com/EvanL1/aisync/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+English | [中文](README.zh-CN.md)
 
 One command to sync your AI agent configs across **Claude Code, Codex, Gemini CLI, Cursor, Copilot, Windsurf, and Cline**.
 
 ```
-.agents/          →    .claude/commands/     (Claude Code)
+.agents/          →    CLAUDE.md             (Claude Code)
 ├── AGENTS.md     →    AGENTS.md             (Codex CLI)
 ├── rules/        →    GEMINI.md             (Gemini CLI)
 ├── skills/       →    .cursor/rules/*.mdc   (Cursor)
@@ -12,71 +17,83 @@ One command to sync your AI agent configs across **Claude Code, Codex, Gemini CL
                   →    .clinerules           (Cline)
 ```
 
-**One source of truth. Seven platforms. Zero config.**
+**One source of truth. Seven platforms. Zero dependencies.**
 
-## Why
+## The Problem
 
-Every AI coding tool has its own config format:
-- Claude Code: `.claude/commands/*.md`
-- Cursor: `.cursor/rules/*.mdc`
-- Copilot: `.github/instructions/*.instructions.md`
-- Codex: just `AGENTS.md`
-- Gemini: `GEMINI.md`
+You maintain `CLAUDE.md` for Claude Code, `.cursorrules` for Cursor, `copilot-instructions.md` for Copilot… and they're all slightly different versions of the same rules. When you update one, you forget the others. When a teammate joins, half the configs are stale.
 
-Maintaining 7 copies of the same rules is insane. `agentsync` reads from one `.agents/` directory and writes to all platforms, **auto-converting file extensions**.
+`aisync` fixes this: write your rules once in `.agents/`, and sync to all platforms with one command. File extensions are auto-converted (`.md` → `.mdc` for Cursor, `.instructions.md` for Copilot).
 
 ## Install
+
+### npm (recommended)
+
+```bash
+npm install -g aisync
+```
 
 ### Cargo (all platforms)
 
 ```bash
-cargo install --git https://github.com/EvanL1/agentsync
+cargo install --git https://github.com/EvanL1/aisync
 ```
 
 ### Homebrew (macOS / Linux)
 
 ```bash
-brew tap EvanL1/agentsync
-brew install agentsync
+brew tap EvanL1/aisync
+brew install aisync
 ```
 
 ### Shell script (macOS / Linux / WSL)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/EvanL1/agentsync/master/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/EvanL1/aisync/master/install.sh | bash
 ```
 
 ### Manual download
 
-Download from [Releases](https://github.com/EvanL1/agentsync/releases):
+Download from [Releases](https://github.com/EvanL1/aisync/releases):
 
 | Platform | File |
 |----------|------|
-| macOS Apple Silicon | `agentsync-darwin-aarch64.tar.gz` |
-| macOS Intel | `agentsync-darwin-x86_64.tar.gz` |
-| Linux x86_64 | `agentsync-linux-x86_64.tar.gz` |
-| Linux ARM64 | `agentsync-linux-aarch64.tar.gz` |
-| Windows x64 | `agentsync-windows-x86_64.zip` |
+| macOS Apple Silicon | `aisync-darwin-aarch64.tar.gz` |
+| macOS Intel | `aisync-darwin-x86_64.tar.gz` |
+| Linux x86_64 | `aisync-linux-x86_64.tar.gz` |
+| Linux ARM64 | `aisync-linux-aarch64.tar.gz` |
+| Windows x64 | `aisync-windows-x86_64.zip` |
 
 ## Quick Start
 
 ```bash
-# 1. Initialize source directory
-agentsync init
-
-# 2. Import your existing Claude Code config
-agentsync import claude
-
-# 3. Edit .agents/AGENTS.md, add rules and skills
-
-# 4. Push to all platforms
-agentsync sync
-
-# 5. Also sync user-level configs (~/.claude/, ~/.codex/, etc.)
-agentsync user
+aisync init                  # create .agents/ with starter AGENTS.md
+aisync import claude         # pull existing Claude Code config (optional)
+# edit .agents/AGENTS.md and .agents/rules/
+aisync sync                  # push to all 7 platforms
 ```
 
-**That's it.** Your rules now work in Claude Code, Codex, Gemini, Cursor, Copilot, Windsurf, and Cline.
+**That's it.** Your rules now work everywhere.
+
+## Real-World Workflow
+
+```bash
+# Team lead writes rules once
+vim .agents/rules/code-style.md
+
+# Push to all AI tools in ~2ms
+aisync sync
+
+# Preview before writing (safe mode)
+aisync sync --dry-run
+
+# Only sync specific platforms
+aisync sync cursor copilot
+
+# Commit everything — source + generated configs
+git add .agents/ .claude/ .cursor/ .github/
+git commit -m "chore: update AI agent rules"
+```
 
 ## Source Layout
 
@@ -110,30 +127,18 @@ agentsync user
 ## Commands
 
 ```bash
-agentsync init                    # Create .agents/ source directory
-agentsync import <platform>       # Import existing config into .agents/
-agentsync sync [platform...]      # Sync to all (or specific) platforms
-agentsync user                    # Sync to user-level (~/.claude/ etc.)
-agentsync status                  # Show source and target status
-agentsync platforms               # List supported platforms
+aisync init                    # Create .agents/ source directory
+aisync import <platform>       # Import existing config into .agents/
+aisync sync [platform...]      # Sync to all (or specific) platforms
+aisync sync --dry-run          # Preview what would be synced
+aisync user                    # Sync to user-level (~/.claude/ etc.)
+aisync status                  # Show source and target status
+aisync platforms               # List supported platforms
 ```
 
-## Examples
+## Should I commit the generated files?
 
-```bash
-# Import from Claude, sync everywhere
-agentsync import claude
-agentsync sync
-
-# Only sync to Codex and Gemini
-agentsync sync codex gemini
-
-# Check what would be synced
-agentsync status
-
-# Sync user-level configs for all platforms
-agentsync user
-```
+**Yes.** Commit both `.agents/` (your source of truth) and the generated platform files (`.claude/`, `.cursor/`, `.github/`, etc.). They're all just markdown — no binaries, no build artifacts. This way, every teammate and CI environment gets the right configs without needing to install aisync.
 
 ## How It Works
 
@@ -142,27 +147,28 @@ agentsync user
 3. **Write** to each platform's expected directory
 4. **Root MD** is copied with platform-specific naming (`AGENTS.md` → `CLAUDE.md`, `GEMINI.md`, etc.)
 
-No git repos, no npm, no config files, no runtime dependencies. Just a single binary.
+No git hooks, no npm, no config files, no runtime dependencies. Just a single binary (~2ms execution).
 
-## vs alternatives
+## vs Alternatives
 
-| | agentsync | ai-rules-sync | manual copy |
+| | aisync | aisync-sync | manual copy |
 |---|---|---|---|
 | Dependencies | **None** (single binary) | Node.js + npm | N/A |
 | Config needed | **Zero** | git repo + JSON | N/A |
 | Extension conversion | **Automatic** | Manual | Manual |
 | Platforms | 7 | ~10 | ∞ |
-| Install | One binary | `npm install -g` | N/A |
-| Speed | **Instant** (~2ms) | ~500ms | Slow |
+| Speed | **~2ms** | ~500ms | Slow |
 
 ## Contributing
 
 ```bash
-git clone https://github.com/EvanL1/agentsync
-cd agentsync
+git clone https://github.com/EvanL1/aisync
+cd aisync
 cargo build
 cargo test
 ```
+
+PRs welcome! If you'd like to add a new platform, edit `src/platforms.rs` — each platform is a single struct.
 
 ## License
 
