@@ -83,6 +83,9 @@ fn cmd_sync(args: &[String]) {
         for e in &r.errors {
             eprintln!("  {} {:10} {e}", red("✗"), r.platform);
         }
+        for w in &r.warnings {
+            eprintln!("  {} {:10} {w}", yellow("⚠"), r.platform);
+        }
     }
 
     // Also sync AGENTS.md to project root

@@ -8,6 +8,7 @@ pub struct SyncResult {
     pub platform: String,
     pub files_synced: usize,
     pub errors: Vec<String>,
+    pub warnings: Vec<String>,
 }
 
 pub fn detect_platforms(project_dir: &Path) -> Vec<&'static Platform> {
@@ -45,6 +46,7 @@ fn sync_platform(project_dir: &Path, source: &Path, platform: &Platform, dry_run
         platform: platform.name.to_string(),
         files_synced: 0,
         errors: vec![],
+        warnings: vec![],
     };
 
     let target_base = project_dir.join(platform.project_dir);
@@ -82,7 +84,7 @@ fn sync_platform(project_dir: &Path, source: &Path, platform: &Platform, dry_run
         let skills_src = source.join("skills");
         if skills_src.is_dir() {
             let skills_dest = target_base.join(skills_subdir);
-            result.files_synced += copy_md_dir(&skills_src, &skills_dest, &mut result.errors, dry_run);
+            result.files_synced += copy_md_dir(&skills_src, &skills_dest, &mut result.errors, dry_run, &mut result.warnings);
         }
     }
 
@@ -91,7 +93,7 @@ fn sync_platform(project_dir: &Path, source: &Path, platform: &Platform, dry_run
         let agents_src = source.join("agents");
         if agents_src.is_dir() {
             let agents_dest = target_base.join(agents_subdir);
-            result.files_synced += copy_md_dir(&agents_src, &agents_dest, &mut result.errors, dry_run);
+            result.files_synced += copy_md_dir(&agents_src, &agents_dest, &mut result.errors, dry_run, &mut result.warnings);
         }
     }
 
@@ -137,7 +139,7 @@ fn sync_rules(src: &Path, dest: &Path, target_ext: &str, errors: &mut Vec<String
 }
 
 /// Copy all .md files as-is
-fn copy_md_dir(src: &Path, dest: &Path, errors: &mut Vec<String>, dry_run: bool) -> usize {
+fn copy_md_dir(src: &Path, dest: &Path, errors: &mut Vec<String>, dry_run: bool, warnings: &mut Vec<String>) -> usize {
     let mut count = 0;
     let entries = match fs::read_dir(src) {
         Ok(e) => e,
@@ -147,6 +149,9 @@ fn copy_md_dir(src: &Path, dest: &Path, errors: &mut Vec<String>, dry_run: bool)
     for entry in entries.flatten() {
         let path = entry.path();
         if path.extension().and_then(|e| e.to_str()) == Some("md") {
+            if let Some(w) = check_frontmatter(&path) {
+                warnings.push(w);
+            }
             let dest_file = dest.join(path.file_name().unwrap());
             if dry_run {
                 count += 1;
@@ -159,6 +164,28 @@ fn copy_md_dir(src: &Path, dest: &Path, errors: &mut Vec<String>, dry_run: bool)
         }
     }
     count
+}
+
+/// Check if a markdown file has valid YAML frontmatter
+fn check_frontmatter(path: &Path) -> Option<String> {
+    let content = fs::read_to_string(path).ok()?;
+    let fname = path.file_name()?.to_string_lossy().to_string();
+
+    if !content.starts_with("---\n") && !content.starts_with("---\r\n") {
+        return Some(format!("{fname}: missing YAML frontmatter"));
+    }
+
+    let rest = &content[4..];
+    if let Some(end) = rest.find("\n---") {
+        let fm = &rest[..end];
+        if !fm.lines().any(|l| l.trim_start().starts_with("description:")) {
+            return Some(format!("{fname}: frontmatter missing 'description'"));
+        }
+    } else {
+        return Some(format!("{fname}: unclosed YAML frontmatter"));
+    }
+
+    None
 }
 
 /// Sync user-level configs
@@ -176,6 +203,7 @@ pub fn sync_user(home: &Path, source: &Path) -> Vec<SyncResult> {
             platform: format!("~/{}", user_dir_str.trim_start_matches("~/")),
             files_synced: 0,
             errors: vec![],
+            warnings: vec![],
         };
 
         let user_dir = home.join(user_dir_str.trim_start_matches("~/"));
@@ -205,7 +233,7 @@ pub fn sync_user(home: &Path, source: &Path) -> Vec<SyncResult> {
             let skills_src = source.join("skills");
             if skills_src.is_dir() {
                 let skills_dest = user_dir.join(skills_subdir);
-                result.files_synced += copy_md_dir(&skills_src, &skills_dest, &mut result.errors, false);
+                result.files_synced += copy_md_dir(&skills_src, &skills_dest, &mut result.errors, false, &mut result.warnings);
             }
         }
 
