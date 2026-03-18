@@ -11,13 +11,14 @@
 <p align="center">English | <a href="README.zh-CN.md">中文</a></p>
 
 ```
-.agents/          →    CLAUDE.md             (Claude Code)
-├── AGENTS.md     →    AGENTS.md             (Codex CLI)
-├── rules/        →    GEMINI.md             (Gemini CLI)
-├── skills/       →    .cursor/rules/*.mdc   (Cursor)
-└── agents/       →    .github/instructions/ (Copilot)
-                  →    .windsurf/rules/      (Windsurf)
-                  →    .clinerules           (Cline)
+.agents/          →    CLAUDE.md                        (Claude Code)
+├── AGENTS.md     →    AGENTS.md                        (Codex CLI)
+├── rules/        →    GEMINI.md                        (Gemini CLI)
+├── skills/       →    .claude/skills/*/SKILL.md        (Claude/Codex/Gemini)
+└── agents/       →    .cursor/rules/*.mdc              (Cursor)
+                  →    .github/instructions/             (Copilot)
+                  →    .windsurf/rules/                  (Windsurf)
+                  →    .clinerules                       (Cline)
 ```
 
 **One source of truth. Seven platforms. Zero dependencies.**
@@ -26,7 +27,7 @@
 
 You maintain `CLAUDE.md` for Claude Code, `.cursorrules` for Cursor, `copilot-instructions.md` for Copilot… and they're all slightly different versions of the same rules. When you update one, you forget the others. When a teammate joins, half the configs are stale.
 
-`aisync` fixes this: write your rules once in `.agents/`, and sync to all platforms with one command. File extensions are auto-converted (`.md` → `.mdc` for Cursor, `.instructions.md` for Copilot).
+`aisync` fixes this: write your rules once in `.agents/`, and sync to all platforms with one command. File extensions are auto-converted (`.md` → `.mdc` for Cursor, `.instructions.md` for Copilot). Skills are synced as `<name>/SKILL.md` directories for platforms that support it.
 
 ## Install
 
@@ -93,9 +94,13 @@ aisync sync --dry-run
 # Only sync specific platforms
 aisync sync cursor copilot
 
-# Commit everything — source + generated configs
-git add .agents/ .claude/ .cursor/ .github/
-git commit -m "chore: update AI agent rules"
+# Sync to remote dev machines (LAN)
+aisync serve                           # on config server
+aisync pull http://192.168.1.100:9753  # on dev machines
+
+# Or push via SSH
+aisync remote add devbox deploy@192.168.1.10
+aisync remote push devbox
 ```
 
 ## Source Layout
@@ -107,8 +112,10 @@ git commit -m "chore: update AI agent rules"
 │   ├── coding-style.md    → .claude/rules/coding-style.md
 │   ├── coding-style.md    → .cursor/rules/coding-style.mdc
 │   └── coding-style.md    → .github/instructions/coding-style.instructions.md
-├── skills/            # Shared skills/commands
-│   └── review.md          → .claude/commands/review.md
+├── skills/            # Shared skills (auto-converted to directory format)
+│   └── deploy.md          → .claude/skills/deploy/SKILL.md
+│                          → .codex/skills/deploy/SKILL.md
+│                          → .gemini/skills/deploy/SKILL.md
 └── agents/            # Shared agent definitions
     └── planner.md         → .claude/agents/planner.md
 ```
@@ -117,9 +124,9 @@ git commit -m "chore: update AI agent rules"
 
 | Platform | Root MD | Rules Dir | Rules Ext | Skills Dir |
 |----------|---------|-----------|-----------|------------|
-| **Claude Code** | `CLAUDE.md` | `.claude/rules/` | `.md` | `.claude/commands/` |
-| **Codex CLI** | `AGENTS.md` | — | — | — |
-| **Gemini CLI** | `GEMINI.md` | — | — | — |
+| **Claude Code** | `CLAUDE.md` | `.claude/rules/` | `.md` | `.claude/skills/*/SKILL.md` |
+| **Codex CLI** | `AGENTS.md` | — | — | `.codex/skills/*/SKILL.md` |
+| **Gemini CLI** | `GEMINI.md` | — | — | `.gemini/skills/*/SKILL.md` |
 | **Cursor** | `.cursorrules` | `.cursor/rules/` | `.mdc` | — |
 | **Copilot** | `.github/copilot-instructions.md` | `.github/instructions/` | `.instructions.md` | — |
 | **Windsurf** | `.windsurfrules` | `.windsurf/rules/` | `.md` | — |
@@ -136,8 +143,35 @@ aisync sync [platform...]      # Sync to all (or specific) platforms
 aisync sync --dry-run          # Preview what would be synced
 aisync user                    # Sync to user-level (~/.claude/ etc.)
 aisync status                  # Show source and target status
+aisync serve [--port 9753]     # Start config server for LAN pull
+aisync pull <url>              # Pull .agents/ from a config server
+aisync remote add <alias> <user@host>  # Register SSH remote
+aisync remote push [alias]     # Push .agents/ to remote via SSH
+aisync remote list             # List registered remotes
 aisync platforms               # List supported platforms
 ```
+
+## Remote Sync (LAN / SSH)
+
+For teams on internal networks or air-gapped environments:
+
+**Config Server (C/S model):**
+```bash
+# On the config server
+aisync serve --port 9753
+
+# On any dev machine
+aisync pull http://config-server:9753
+```
+
+**SSH Push:**
+```bash
+aisync remote add devbox deploy@192.168.1.10
+aisync remote push devbox          # rsync + ssh aisync sync
+aisync remote push --all           # push to all remotes
+```
+
+Config server defaults to port **9753** (override with `--port`). Remotes are stored in `.agents/remotes.toml`. SSH uses `rsync` (falls back to `scp`), with `BatchMode=yes` and `ConnectTimeout=10` by default.
 
 ## Should I commit the generated files?
 
@@ -147,20 +181,11 @@ aisync platforms               # List supported platforms
 
 1. **Read** `.agents/` source directory (`.md` files)
 2. **Convert** extensions per platform (`.md` → `.mdc` for Cursor, `.instructions.md` for Copilot)
-3. **Write** to each platform's expected directory
-4. **Root MD** is copied with platform-specific naming (`AGENTS.md` → `CLAUDE.md`, `GEMINI.md`, etc.)
+3. **Convert** skills to directory format (`deploy.md` → `deploy/SKILL.md`) for Claude/Codex/Gemini
+4. **Write** to each platform's expected directory
+5. **Validate** frontmatter and warn about missing `description` fields
 
 No git hooks, no npm, no config files, no runtime dependencies. Just a single binary (~2ms execution).
-
-## vs Alternatives
-
-| | aitoolsync | ai-rules-sync | manual copy |
-|---|---|---|---|
-| Dependencies | **None** (single binary) | Node.js + npm | N/A |
-| Config needed | **Zero** | git repo + JSON | N/A |
-| Extension conversion | **Automatic** | Manual | Manual |
-| Platforms | 7 | ~10 | ∞ |
-| Speed | **~2ms** | ~500ms | Slow |
 
 ## Contributing
 
@@ -169,6 +194,7 @@ git clone https://github.com/EvanL1/aitoolsync
 cd aitoolsync
 cargo build
 cargo test
+cargo clippy -- -D warnings
 ```
 
 PRs welcome! If you'd like to add a new platform, edit `src/platforms.rs` — each platform is a single struct.
