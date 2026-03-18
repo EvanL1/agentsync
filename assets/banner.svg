@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="300" viewBox="0 0 900 300">
+  <defs>
+    <!-- Background gradient -->
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0a0e1a"/>
+      <stop offset="50%" style="stop-color:#0d1525"/>
+      <stop offset="100%" style="stop-color:#0a1628"/>
+    </linearGradient>
+    <!-- Accent gradient for the glow lines -->
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#00d4ff;stop-opacity:0"/>
+      <stop offset="50%" style="stop-color:#00d4ff;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#7b61ff;stop-opacity:0"/>
+    </linearGradient>
+    <!-- Title gradient -->
+    <linearGradient id="titleGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#00d4ff"/>
+      <stop offset="100%" style="stop-color:#7b61ff"/>
+    </linearGradient>
+    <!-- Glow filter -->
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <!-- Soft glow for subtitle -->
+    <filter id="softGlow">
+      <feGaussianBlur stdDeviation="1.5" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <!-- Grid pattern -->
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1a2744" stroke-width="0.5" opacity="0.4"/>
+    </pattern>
+    <!-- Particle dots -->
+    <radialGradient id="dot">
+      <stop offset="0%" style="stop-color:#00d4ff;stop-opacity:0.8"/>
+      <stop offset="100%" style="stop-color:#00d4ff;stop-opacity:0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="900" height="300" fill="url(#bg)"/>
+
+  <!-- Grid overlay -->
+  <rect width="900" height="300" fill="url(#grid)" opacity="0.3"/>
+
+  <!-- Decorative particles -->
+  <circle cx="120" cy="60" r="2" fill="#00d4ff" opacity="0.5"/>
+  <circle cx="780" cy="80" r="1.5" fill="#7b61ff" opacity="0.6"/>
+  <circle cx="200" cy="240" r="1" fill="#00d4ff" opacity="0.4"/>
+  <circle cx="700" cy="230" r="2.5" fill="#7b61ff" opacity="0.3"/>
+  <circle cx="50" cy="150" r="1.5" fill="#00d4ff" opacity="0.3"/>
+  <circle cx="850" cy="160" r="1" fill="#7b61ff" opacity="0.5"/>
+  <circle cx="350" cy="30" r="1" fill="#00d4ff" opacity="0.4"/>
+  <circle cx="550" cy="270" r="1.5" fill="#7b61ff" opacity="0.4"/>
+
+  <!-- Top accent line -->
+  <line x1="150" y1="80" x2="750" y2="80" stroke="url(#accent)" stroke-width="1" opacity="0.6"/>
+
+  <!-- Sync icon (two rotating arrows) -->
+  <g transform="translate(450, 138)" filter="url(#glow)" opacity="0.9">
+    <path d="M-22,-8 A 18 18 0 0 1 14,-14 L 10,-20 L 22,-10 L 8,-6 L 12,-12 A 13 13 0 0 0 -18,-6" fill="none" stroke="#00d4ff" stroke-width="2"/>
+    <path d="M22,8 A 18 18 0 0 1 -14,14 L -10,20 L -22,10 L -8,6 L -12,12 A 13 13 0 0 0 18,6" fill="none" stroke="#7b61ff" stroke-width="2"/>
+  </g>
+
+  <!-- Title -->
+  <text x="450" y="185" text-anchor="middle" font-family="'SF Pro Display', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="52" font-weight="800" letter-spacing="4" fill="url(#titleGrad)" filter="url(#glow)">AITOOLSYNC</text>
+
+  <!-- Subtitle -->
+  <text x="450" y="218" text-anchor="middle" font-family="'SF Mono', 'Fira Code', 'Cascadia Code', monospace" font-size="16" fill="#8899bb" letter-spacing="3" filter="url(#softGlow)">One source. Seven platforms. Zero config.</text>
+
+  <!-- Bottom accent line -->
+  <line x1="150" y1="240" x2="750" y2="240" stroke="url(#accent)" stroke-width="1" opacity="0.6"/>
+
+  <!-- Platform tags -->
+  <g font-family="'SF Mono', 'Fira Code', monospace" font-size="11" fill="#4a6a8a" letter-spacing="1">
+    <text x="450" y="268" text-anchor="middle">Claude Code  ·  Codex  ·  Gemini CLI  ·  Cursor  ·  Copilot  ·  Windsurf  ·  Cline</text>
+  </g>
+</svg>

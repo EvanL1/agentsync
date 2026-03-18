@@ -1,9 +1,14 @@
-# aitoolsync
+<p align="center">
+  <img src="assets/banner.svg" alt="aitoolsync" width="900"/>
+</p>
 
-[![CI](https://github.com/EvanL1/aitoolsync/actions/workflows/ci.yml/badge.svg)](https://github.com/EvanL1/aitoolsync/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+<p align="center">
+  <a href="https://github.com/EvanL1/aitoolsync/actions/workflows/ci.yml"><img src="https://github.com/EvanL1/aitoolsync/actions/workflows/ci.yml/badge.svg" alt="CI"/></a>
+  <a href="https://www.npmjs.com/package/aitoolsync"><img src="https://img.shields.io/npm/v/aitoolsync?color=00d4ff" alt="npm"/></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"/></a>
+</p>
 
-[English](README.md) | 中文
+<p align="center"><a href="README.md">English</a> | 中文</p>
 
 一条命令，将 AI 编程助手的配置同步到 **Claude Code、Codex、Gemini CLI、Cursor、Copilot、Windsurf 和 Cline** 七个平台。
 
@@ -37,13 +42,6 @@ npm install -g aitoolsync
 
 ```bash
 cargo install --git https://github.com/EvanL1/aitoolsync
-```
-
-### Homebrew（macOS / Linux）
-
-```bash
-brew tap EvanL1/aitoolsync
-brew install aisync
 ```
 
 ### Shell 脚本（macOS / Linux / WSL）
