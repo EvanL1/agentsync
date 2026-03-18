@@ -1,4 +1,6 @@
 mod platforms;
+mod remote;
+mod server;
 mod sync;
 
 use std::path::PathBuf;
@@ -21,6 +23,9 @@ fn main() {
         "status" | "st" => cmd_status(),
         "import" => cmd_import(&args[1..]),
         "user" => cmd_user(),
+        "serve" => cmd_serve(&args[1..]),
+        "pull" => cmd_pull(&args[1..]),
+        "remote" => cmd_remote(&args[1..]),
         "platforms" | "ls" => cmd_platforms(),
         "help" | "h" | "--help" | "-h" => cmd_help(),
         "version" | "-v" | "--version" => println!("aisync {}", env!("CARGO_PKG_VERSION")),
@@ -192,6 +197,123 @@ fn cmd_platforms() {
     }
 }
 
+fn cmd_serve(args: &[String]) {
+    let dir = project_dir();
+    let mut port: u16 = 9753;
+    let mut bind = "0.0.0.0".to_string();
+
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--port" if i + 1 < args.len() => { port = args[i + 1].parse().unwrap_or(9753); i += 2; }
+            "--bind" if i + 1 < args.len() => { bind = args[i + 1].clone(); i += 2; }
+            _ => { i += 1; }
+        }
+    }
+
+    println!("{} Serving .agents/ on {}:{}", bold("aisync serve"), bind, port);
+    println!("  Pull from remote: aisync pull http://<this-ip>:{port}\n");
+    if let Err(e) = server::serve(&dir, &bind, port) {
+        eprintln!("{} Server error: {e}", red("✗"));
+    }
+}
+
+fn cmd_pull(args: &[String]) {
+    if args.is_empty() {
+        eprintln!("Usage: aisync pull <url>\nExample: aisync pull http://192.168.1.100:9753");
+        return;
+    }
+    let url = &args[0];
+    let dry_run = args.iter().any(|a| a == "--dry-run" || a == "-n");
+    let dir = project_dir();
+
+    match remote::pull_from(&dir, url, dry_run) {
+        Ok(count) => {
+            println!("{} Pulled {count} files from {url}", green("✓"));
+            if !dry_run && count > 0 {
+                println!("Running sync...");
+                cmd_sync(&[]);
+            }
+        }
+        Err(e) => eprintln!("{} Pull failed: {e}", red("✗")),
+    }
+}
+
+fn cmd_remote(args: &[String]) {
+    let sub = args.first().map(|s| s.as_str()).unwrap_or("list");
+    let dir = project_dir();
+
+    match sub {
+        "add" => {
+            if args.len() < 3 {
+                eprintln!("Usage: aisync remote add <alias> <user@host[:port]>");
+                return;
+            }
+            match remote::add_remote(&dir, &args[1], &args[2]) {
+                Ok(()) => println!("{} Added remote '{}' → {}", green("✓"), args[1], args[2]),
+                Err(e) => eprintln!("{} {e}", red("✗")),
+            }
+        }
+        "remove" | "rm" => {
+            if args.len() < 2 {
+                eprintln!("Usage: aisync remote remove <alias>");
+                return;
+            }
+            match remote::remove_remote(&dir, &args[1]) {
+                Ok(true) => println!("{} Removed remote '{}'", green("✓"), args[1]),
+                Ok(false) => eprintln!("{} Remote '{}' not found", yellow("⚠"), args[1]),
+                Err(e) => eprintln!("{} {e}", red("✗")),
+            }
+        }
+        "push" => {
+            let dry_run = args.iter().any(|a| a == "--dry-run" || a == "-n");
+            let all = args.iter().any(|a| a == "--all");
+            let alias: Option<&str> = args.iter()
+                .skip(1)
+                .find(|a| !a.starts_with('-'))
+                .map(|s| s.as_str());
+
+            let remotes = remote::load_remotes(&dir);
+            if remotes.is_empty() {
+                eprintln!("No remotes configured. Run `aisync remote add <alias> <user@host>`");
+                return;
+            }
+
+            let targets: Vec<&remote::RemoteHost> = if all {
+                remotes.iter().collect()
+            } else if let Some(a) = alias {
+                match remotes.iter().find(|r| r.alias == a) {
+                    Some(r) => vec![r],
+                    None => { eprintln!("{} Remote '{a}' not found", red("✗")); return; }
+                }
+            } else {
+                remotes.iter().collect()
+            };
+
+            for r in targets {
+                print!("  {} {:10} → {}...", dim("○"), r.alias, r.host);
+                match remote::push_to_remote(&dir, r, dry_run) {
+                    Ok(_) => println!("\r  {} {:10} → {}", green("✓"), r.alias, r.host),
+                    Err(e) => println!("\r  {} {:10} {e}", red("✗"), r.alias),
+                }
+            }
+        }
+        "list" | "ls" => {
+            let remotes = remote::load_remotes(&dir);
+            if remotes.is_empty() {
+                println!("No remotes configured.");
+            } else {
+                println!("{}\n", bold("Remotes:"));
+                for r in &remotes {
+                    let port = if r.port != 22 { format!(" (port {})", r.port) } else { String::new() };
+                    println!("  {:10} → {}{} path={}", r.alias, r.host, port, r.path);
+                }
+            }
+        }
+        _ => eprintln!("Unknown remote command: {sub}\nUsage: aisync remote [add|remove|push|list]"),
+    }
+}
+
 fn cmd_help() {
     println!("{}\n", bold("aisync — Sync AI agent configs across all platforms"));
     println!("Usage: aisync <command> [args]\n");
@@ -201,23 +323,16 @@ fn cmd_help() {
     println!("  import <platform> Import existing platform config into .agents/");
     println!("  user              Sync .agents/ → user-level configs (~/.claude/ etc.)");
     println!("  status            Show source and target status");
+    println!("  serve [--port N]  Start config server (default port 9753)");
+    println!("  pull <url>        Pull .agents/ from a config server");
+    println!("  remote add <alias> <user@host>  Register SSH remote");
+    println!("  remote push [alias|--all]       Push .agents/ via SSH");
+    println!("  remote list       List registered remotes");
     println!("  platforms         List supported platforms");
     println!("  help              Show this help\n");
     println!("Flags:");
     println!("  --dry-run, -n     Preview sync without writing files\n");
-    println!("Workflow:");
-    println!("  1. aisync init                    # create .agents/");
-    println!("  2. aisync import claude            # import from existing Claude config");
-    println!("  3. # edit .agents/AGENTS.md, rules/, skills/");
-    println!("  4. aisync sync                     # push to all platforms");
-    println!("  5. aisync user                     # also sync user-level configs\n");
     println!("Platforms: {}\n", platforms::platform_names().join(", "));
-    println!("Source layout:");
-    println!("  .agents/");
-    println!("  ├── AGENTS.md     → CLAUDE.md, .codex/AGENTS.md, GEMINI.md, ...");
-    println!("  ├── rules/        → .claude/rules/, .codex/rules/, .cursor/rules/, ...");
-    println!("  ├── skills/       → .claude/commands/, .codex/skills/, .gemini/skills/, ...");
-    println!("  └── agents/       → .claude/agents/, .codex/agents/, ...");
 }
 
 fn count_md_files(dir: &std::path::Path) -> usize {

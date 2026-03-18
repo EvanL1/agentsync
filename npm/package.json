@@ -1,6 +1,6 @@
 {
   "name": "aitoolsync",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "One command to sync AI agent configs across Claude Code, Codex, Gemini CLI, Cursor, Copilot, Windsurf, and Cline",
   "license": "MIT",
   "repository": {
