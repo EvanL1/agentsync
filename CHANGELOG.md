@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.5.0] - 2026-04-07
+
+### Added
+- **Platform-specific extras**: `extra_files` and `extra_dirs` fields in `Platform` struct for runtime configs that don't fit the shared rules/skills/agents model
+- Claude Code now imports and syncs: `settings.json`, `.mcp.json`, `hooks/`, `plugins/`, and `output-styles/`
+- Extras are stored under `.agents/platforms/<name>/` to stay namespaced from shared configs
+- `SKIP_DIRS` constant to automatically exclude build artifacts (`node_modules`, `target`, `cache`, `__pycache__`, etc.) when copying extra directories
+
+### Fixed
+- **CLAUDE.md never imported**: init template (66 chars) exceeded the 50-char threshold; now compares against exact template content instead of arbitrary length
+- **Root MD import for user-level configs**: falls back to user-level path (e.g. `~/.claude/CLAUDE.md`) when project-level file doesn't exist
+- **Agent subdirectories ignored**: `import_md_files` and `copy_md_dir` now recurse into subdirectories (e.g. `_negotiation/`, `_shared/`)
+- **`sync_user` missing agents**: added agents sync step to user-level sync
+- **Codex rules never synced**: changed `rules_dir` from `None` to `Some("rules")`
+
+### Architecture
+- New `copy_dir_all()` — recursive copy for any file type (not just `.md`), with `SKIP_DIRS` filtering
+- New `sync_extras()` — syncs platform-specific extra files and directories
+
+## [0.4.2] - 2026-04-07
+
+### Fixed
+- Fixed CLAUDE.md import, agent subdirectories, and Codex rules sync (see 0.5.0 for details — released together)
+
 ## [0.4.1] - 2026-03-18
 
 ### Changed

@@ -11,14 +11,17 @@
 <p align="center">English | <a href="README.zh-CN.md">中文</a></p>
 
 ```
-.agents/          →    CLAUDE.md                        (Claude Code)
-├── AGENTS.md     →    AGENTS.md                        (Codex CLI)
-├── rules/        →    GEMINI.md                        (Gemini CLI)
-├── skills/       →    .claude/skills/*/SKILL.md        (Claude/Codex/Gemini)
-└── agents/       →    .cursor/rules/*.mdc              (Cursor)
-                  →    .github/instructions/             (Copilot)
-                  →    .windsurf/rules/                  (Windsurf)
-                  →    .clinerules                       (Cline)
+.agents/              →    CLAUDE.md                        (Claude Code)
+├── AGENTS.md         →    AGENTS.md                        (Codex CLI)
+├── rules/            →    GEMINI.md                        (Gemini CLI)
+├── skills/           →    .claude/skills/*/SKILL.md        (Claude/Codex/Gemini)
+├── agents/           →    .cursor/rules/*.mdc              (Cursor)
+└── platforms/        →    .github/instructions/             (Copilot)
+    └── claude/       →    .windsurf/rules/                  (Windsurf)
+        ├── settings.json     →    .clinerules              (Cline)
+        ├── .mcp.json
+        ├── hooks/
+        └── plugins/
 ```
 
 **One source of truth. Seven platforms. Zero dependencies.**
@@ -116,21 +119,29 @@ aisync remote push devbox
 │   └── deploy.md          → .claude/skills/deploy/SKILL.md
 │                          → .codex/skills/deploy/SKILL.md
 │                          → .gemini/skills/deploy/SKILL.md
-└── agents/            # Shared agent definitions
-    └── planner.md         → .claude/agents/planner.md
+├── agents/            # Shared agent definitions (supports subdirectories)
+│   ├── planner.md         → .claude/agents/planner.md
+│   └── _shared/           → .claude/agents/_shared/
+└── platforms/         # Platform-specific runtime configs
+    └── claude/
+        ├── settings.json  → ~/.claude/settings.json
+        ├── .mcp.json      → ~/.claude/.mcp.json
+        ├── hooks/         → ~/.claude/hooks/
+        ├── plugins/       → ~/.claude/plugins/
+        └── output-styles/ → ~/.claude/output-styles/
 ```
 
 ## Platform Mapping
 
-| Platform | Root MD | Rules Dir | Rules Ext | Skills Dir |
-|----------|---------|-----------|-----------|------------|
-| **Claude Code** | `CLAUDE.md` | `.claude/rules/` | `.md` | `.claude/skills/*/SKILL.md` |
-| **Codex CLI** | `AGENTS.md` | — | — | `.codex/skills/*/SKILL.md` |
-| **Gemini CLI** | `GEMINI.md` | — | — | `.gemini/skills/*/SKILL.md` |
-| **Cursor** | `.cursorrules` | `.cursor/rules/` | `.mdc` | — |
-| **Copilot** | `.github/copilot-instructions.md` | `.github/instructions/` | `.instructions.md` | — |
-| **Windsurf** | `.windsurfrules` | `.windsurf/rules/` | `.md` | — |
-| **Cline** | `.clinerules` | — | — | — |
+| Platform | Root MD | Rules Dir | Rules Ext | Skills Dir | Extras |
+|----------|---------|-----------|-----------|------------|--------|
+| **Claude Code** | `CLAUDE.md` | `.claude/rules/` | `.md` | `.claude/skills/*/SKILL.md` | settings.json, .mcp.json, hooks/, plugins/, output-styles/ |
+| **Codex CLI** | `AGENTS.md` | `.codex/rules/` | `.md` | `.codex/skills/*/SKILL.md` | — |
+| **Gemini CLI** | `GEMINI.md` | — | — | `.gemini/skills/*/SKILL.md` | — |
+| **Cursor** | `.cursorrules` | `.cursor/rules/` | `.mdc` | — | — |
+| **Copilot** | `.github/copilot-instructions.md` | `.github/instructions/` | `.instructions.md` | — | — |
+| **Windsurf** | `.windsurfrules` | `.windsurf/rules/` | `.md` | — | — |
+| **Cline** | `.clinerules` | — | — | — | — |
 
 `AGENTS.md` is always synced to project root as the [universal standard](https://agents.md/).
 
@@ -179,11 +190,13 @@ Config server defaults to port **9753** (override with `--port`). Remotes are st
 
 ## How It Works
 
-1. **Read** `.agents/` source directory (`.md` files)
+1. **Read** `.agents/` source directory (`.md` files + platform extras)
 2. **Convert** extensions per platform (`.md` → `.mdc` for Cursor, `.instructions.md` for Copilot)
 3. **Convert** skills to directory format (`deploy.md` → `deploy/SKILL.md`) for Claude/Codex/Gemini
-4. **Write** to each platform's expected directory
-5. **Validate** frontmatter and warn about missing `description` fields
+4. **Copy** platform-specific configs from `.agents/platforms/<name>/` (settings, hooks, plugins, etc.)
+5. **Write** to each platform's expected directory
+6. **Validate** frontmatter and warn about missing `description` fields
+7. **Skip** build artifacts (`node_modules/`, `target/`, `cache/`, etc.) when copying extras
 
 No git hooks, no npm, no config files, no runtime dependencies. Just a single binary (~2ms execution).
 

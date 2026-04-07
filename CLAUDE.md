@@ -34,10 +34,11 @@ Three source files, each with a clear responsibility:
 .agents/AGENTS.md   →  CLAUDE.md, AGENTS.md, GEMINI.md, .cursorrules, ...
 .agents/rules/*.md  →  .claude/rules/*.md, .cursor/rules/*.mdc, .github/instructions/*.instructions.md, ...
 .agents/skills/*.md →  .claude/skills/*/SKILL.md, .codex/skills/*/SKILL.md, .gemini/skills/*/SKILL.md
-.agents/agents/*.md →  .claude/agents/*.md
+.agents/agents/*.md →  .claude/agents/*.md (recursive — supports subdirectories)
+.agents/platforms/claude/{settings.json,.mcp.json,hooks/,plugins/,output-styles/} → ~/.claude/
 ```
 
-Skills use directory format (`<name>/SKILL.md`) for Claude Code, Codex, and Gemini. The `skills_as_dir` flag in `Platform` controls this conversion.
+Skills use directory format (`<name>/SKILL.md`) for Claude Code, Codex, and Gemini. The `skills_as_dir` flag in `Platform` controls this conversion. Platform-specific extras (settings, hooks, plugins) are stored under `.agents/platforms/<name>/` and synced via `extra_files`/`extra_dirs` fields. Build artifacts (`node_modules`, `target`, `cache`, etc.) are auto-skipped.
 
 ### Adding a new platform
 

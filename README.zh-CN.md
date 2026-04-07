@@ -13,13 +13,17 @@
 一条命令，将 AI 编程助手的配置同步到 **Claude Code、Codex、Gemini CLI、Cursor、Copilot、Windsurf 和 Cline** 七个平台。
 
 ```
-.agents/          →    CLAUDE.md             (Claude Code)
-├── AGENTS.md     →    AGENTS.md             (Codex CLI)
-├── rules/        →    GEMINI.md             (Gemini CLI)
-├── skills/       →    .cursor/rules/*.mdc   (Cursor)
-└── agents/       →    .github/instructions/ (Copilot)
-                  →    .windsurf/rules/      (Windsurf)
-                  →    .clinerules           (Cline)
+.agents/              →    CLAUDE.md             (Claude Code)
+├── AGENTS.md         →    AGENTS.md             (Codex CLI)
+├── rules/            →    GEMINI.md             (Gemini CLI)
+├── skills/           →    .cursor/rules/*.mdc   (Cursor)
+├── agents/           →    .github/instructions/ (Copilot)
+└── platforms/        →    .windsurf/rules/      (Windsurf)
+    └── claude/       →    .clinerules           (Cline)
+        ├── settings.json
+        ├── .mcp.json
+        ├── hooks/
+        └── plugins/
 ```
 
 **一份源文件，七个平台，零配置。**
@@ -109,23 +113,33 @@ git commit -m "chore: update AI agent rules"
 │   ├── coding-style.md    → .claude/rules/coding-style.md
 │   ├── coding-style.md    → .cursor/rules/coding-style.mdc
 │   └── coding-style.md    → .github/instructions/coding-style.instructions.md
-├── skills/            # 共享技能/命令
-│   └── review.md          → .claude/commands/review.md
-└── agents/            # 共享 Agent 定义
-    └── planner.md         → .claude/agents/planner.md
+├── skills/            # 共享技能（自动转换为目录格式）
+│   └── deploy.md          → .claude/skills/deploy/SKILL.md
+│                          → .codex/skills/deploy/SKILL.md
+│                          → .gemini/skills/deploy/SKILL.md
+├── agents/            # 共享 Agent 定义（支持子目录）
+│   ├── planner.md         → .claude/agents/planner.md
+│   └── _shared/           → .claude/agents/_shared/
+└── platforms/         # 平台特有的运行时配置
+    └── claude/
+        ├── settings.json  → ~/.claude/settings.json
+        ├── .mcp.json      → ~/.claude/.mcp.json
+        ├── hooks/         → ~/.claude/hooks/
+        ├── plugins/       → ~/.claude/plugins/
+        └── output-styles/ → ~/.claude/output-styles/
 ```
 
 ## 平台映射表
 
-| 平台 | 根文件 | 规则目录 | 规则扩展名 | 技能目录 |
-|------|--------|----------|------------|----------|
-| **Claude Code** | `CLAUDE.md` | `.claude/rules/` | `.md` | `.claude/commands/` |
-| **Codex CLI** | `AGENTS.md` | — | — | — |
-| **Gemini CLI** | `GEMINI.md` | — | — | — |
-| **Cursor** | `.cursorrules` | `.cursor/rules/` | `.mdc` | — |
-| **Copilot** | `.github/copilot-instructions.md` | `.github/instructions/` | `.instructions.md` | — |
-| **Windsurf** | `.windsurfrules` | `.windsurf/rules/` | `.md` | — |
-| **Cline** | `.clinerules` | — | — | — |
+| 平台 | 根文件 | 规则目录 | 规则扩展名 | 技能目录 | 额外配置 |
+|------|--------|----------|------------|----------|----------|
+| **Claude Code** | `CLAUDE.md` | `.claude/rules/` | `.md` | `.claude/skills/*/SKILL.md` | settings.json, .mcp.json, hooks/, plugins/, output-styles/ |
+| **Codex CLI** | `AGENTS.md` | `.codex/rules/` | `.md` | `.codex/skills/*/SKILL.md` | — |
+| **Gemini CLI** | `GEMINI.md` | — | — | `.gemini/skills/*/SKILL.md` | — |
+| **Cursor** | `.cursorrules` | `.cursor/rules/` | `.mdc` | — | — |
+| **Copilot** | `.github/copilot-instructions.md` | `.github/instructions/` | `.instructions.md` | — | — |
+| **Windsurf** | `.windsurfrules` | `.windsurf/rules/` | `.md` | — | — |
+| **Cline** | `.clinerules` | — | — | — | — |
 
 `AGENTS.md` 始终会同步到项目根目录，作为[通用标准](https://agents.md/)。
 
@@ -138,6 +152,11 @@ aisync sync [platform...]      # 同步到所有（或指定的）平台
 aisync sync --dry-run          # 预览将会同步的内容
 aisync user                    # 同步到用户级配置（~/.claude/ 等）
 aisync status                  # 显示源和目标状态
+aisync serve [--port 9753]     # 启动配置服务器（局域网同步）
+aisync pull <url>              # 从配置服务器拉取 .agents/
+aisync remote add <alias> <user@host>  # 注册 SSH 远程主机
+aisync remote push [alias]     # 通过 SSH 推送 .agents/ 到远程
+aisync remote list             # 列出已注册的远程主机
 aisync platforms               # 列出支持的平台
 ```
 
@@ -147,10 +166,13 @@ aisync platforms               # 列出支持的平台
 
 ## 工作原理
 
-1. **读取** `.agents/` 源目录中的 `.md` 文件
+1. **读取** `.agents/` 源目录（`.md` 文件 + 平台特有配置）
 2. **转换** 文件扩展名（`.md` → Cursor 的 `.mdc`，Copilot 的 `.instructions.md`）
-3. **写入** 到每个平台期望的目录
-4. **根文件** 按平台命名复制（`AGENTS.md` → `CLAUDE.md`、`GEMINI.md` 等）
+3. **转换** 技能为目录格式（`deploy.md` → `deploy/SKILL.md`），适用于 Claude/Codex/Gemini
+4. **复制** 平台特有配置（`.agents/platforms/<name>/` → settings、hooks、plugins 等）
+5. **写入** 到每个平台期望的目录
+6. **验证** frontmatter 格式，缺少 `description` 字段时发出警告
+7. **跳过** 构建产物（`node_modules/`、`target/`、`cache/` 等）
 
 不依赖 git hooks、npm、配置文件或任何运行时。只是一个单独的二进制文件（执行时间 ~2ms）。
 
