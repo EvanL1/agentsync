@@ -59,7 +59,7 @@ pub const PLATFORMS: &[Platform] = &[
         root_md_in_subdir: false,
 
         project_dir: ".codex",
-        rules_dir: None,
+        rules_dir: Some("rules"),
         rules_ext: "md",
         skills_dir: Some("skills"),
         skills_as_dir: true,              // skills/<name>/SKILL.md

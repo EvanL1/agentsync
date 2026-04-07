@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use crate::platforms::{Platform, PLATFORMS, UNIVERSAL_ROOT_MD};
 
 const SOURCE_DIR: &str = ".agents";
+const INIT_TEMPLATE: &str = "# Agent Instructions\n\nShared instructions for all AI coding agents.\n";
 
 pub struct SyncResult {
     pub platform: String,
@@ -142,7 +143,7 @@ fn sync_rules(src: &Path, dest: &Path, target_ext: &str, errors: &mut Vec<String
     count
 }
 
-/// Copy all .md files as-is
+/// Copy all .md files and subdirectories recursively
 fn copy_md_dir(src: &Path, dest: &Path, errors: &mut Vec<String>, dry_run: bool, warnings: &mut Vec<String>) -> usize {
     let mut count = 0;
     let entries = match fs::read_dir(src) {
@@ -152,7 +153,10 @@ fn copy_md_dir(src: &Path, dest: &Path, errors: &mut Vec<String>, dry_run: bool,
 
     for entry in entries.flatten() {
         let path = entry.path();
-        if path.extension().and_then(|e| e.to_str()) == Some("md") {
+        if path.is_dir() {
+            let sub_dest = dest.join(path.file_name().unwrap());
+            count += copy_md_dir(&path, &sub_dest, errors, dry_run, warnings);
+        } else if path.extension().and_then(|e| e.to_str()) == Some("md") {
             if let Some(w) = check_frontmatter(&path) {
                 warnings.push(w);
             }
@@ -274,6 +278,15 @@ pub fn sync_user(home: &Path, source: &Path) -> Vec<SyncResult> {
             }
         }
 
+        // Agents
+        if let Some(agents_subdir) = platform.agents_dir {
+            let agents_src = source.join("agents");
+            if agents_src.is_dir() {
+                let agents_dest = user_dir.join(agents_subdir);
+                result.files_synced += copy_md_dir(&agents_src, &agents_dest, &mut result.errors, false, &mut result.warnings);
+            }
+        }
+
         if result.files_synced > 0 {
             results.push(result);
         }
@@ -295,14 +308,29 @@ pub fn import_from(project_dir: &Path, platform_name: &str) -> Result<usize, Str
     let mut count = 0;
 
     // Import root md → AGENTS.md
+    // Check project-level first, then fall back to user-level path
     let root_md = if platform.root_md_in_subdir {
         platform_dir.join(platform.root_md)
     } else {
-        project_dir.join(platform.root_md)
+        let project_level = project_dir.join(platform.root_md);
+        if project_level.exists() {
+            project_level
+        } else if let Some(user_md) = platform.user_root_md {
+            // Fall back to user-level: e.g. ~/.claude/CLAUDE.md
+            platform_dir.join(user_md)
+        } else {
+            project_level
+        }
     };
     if root_md.exists() {
         let dest = source.join("AGENTS.md");
-        if !dest.exists() || fs::read_to_string(&dest).unwrap_or_default().trim().len() < 50 {
+        let should_copy = if !dest.exists() {
+            true
+        } else {
+            let existing = fs::read_to_string(&dest).unwrap_or_default();
+            existing.trim() == INIT_TEMPLATE.trim() || existing.trim().is_empty()
+        };
+        if should_copy {
             fs::copy(&root_md, &dest).map_err(|e| e.to_string())?;
             count += 1;
         }
@@ -401,7 +429,11 @@ fn import_md_files(src: &Path, dest: &Path) -> std::io::Result<usize> {
     let mut count = 0;
     for entry in fs::read_dir(src)?.flatten() {
         let path = entry.path();
-        if path.extension().and_then(|e| e.to_str()) == Some("md") {
+        if path.is_dir() {
+            // Recurse into subdirectories (e.g. _negotiation/, _shared/)
+            let sub_dest = dest.join(path.file_name().unwrap());
+            count += import_md_files(&path, &sub_dest)?;
+        } else if path.extension().and_then(|e| e.to_str()) == Some("md") {
             let dest_file = dest.join(path.file_name().unwrap());
             if !dest_file.exists() {
                 fs::copy(&path, &dest_file)?;
@@ -420,7 +452,7 @@ pub fn init_source(project_dir: &Path) -> std::io::Result<PathBuf> {
 
     let agents_md = source.join("AGENTS.md");
     if !agents_md.exists() {
-        fs::write(&agents_md, "# Agent Instructions\n\nShared instructions for all AI coding agents.\n")?;
+        fs::write(&agents_md, INIT_TEMPLATE)?;
     }
     Ok(source)
 }
